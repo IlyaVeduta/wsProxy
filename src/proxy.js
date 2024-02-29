@@ -1,111 +1,96 @@
 /**
  * Dependencies
  */
-var net     = require('net');
-var mes     = require('./message');
+const WebSocket = require('ws');
+const mes = require('./message');
 
 /**
  * Constructor
  */
-var Proxy = function Constructor(ws) {
-	this._tcp;
-	this._from = ws.upgradeReq.connection.remoteAddress;
-	this._to   = ws.upgradeReq.url.substr(1);
-	this._ws   = ws;
+class Proxy {
+	constructor(ws) {
+		this._ws = ws;
+		this._from = ws._socket.remoteAddress;
+		this._to   = ws.upgradeReq.url.substr(1);
+		// Bind data
+		this._ws.on('message', this.clientData.bind(this));
+		this._ws.on('close', this.close.bind(this));
+		this._ws.on('error', this.close.bind(this));
 
-	// Bind data
-	this._ws.on('message', this.clientData.bind(this) );
-	this._ws.on('close', this.close.bind(this) );
-	this._ws.on('error', this.close.bind(this) );
+		// Create a WebSocket connection to the server
+		this._serverSocket = new WebSocket("wss://" + this._to);
 
-	// Initialize proxy
-	var args = this._to.split(':');
+		this._serverSocket.on('message', this.serverData.bind(this));
 
-	// Connect to server
-	mes.info("Requested connection from '%s' to '%s' [ACCEPTED].", this._from, this._to);
-	this._tcp = net.connect( args[1], args[0] );
+		this._serverSocket.on('open', () => {
+			this.connectAccept();
+		});
 
-	// Disable nagle algorithm
-	this._tcp.setTimeout(0)
-	this._tcp.setNoDelay(true)
+		this._serverSocket.on('close', () => {
+			this.close();
+		});
 
-	this._tcp.on('data', this.serverData.bind(this) );
-	this._tcp.on('close', this.close.bind(this) );
-	this._tcp.on('error', function(error) {
-		console.log(error);
-	});
-	
-	this._tcp.on('connect', this.connectAccept.bind(this) );
-}
-
-
-/**
- * OnClientData
- * Client -> Server
- */
-Proxy.prototype.clientData = function OnServerData(data) {
-	if (!this._tcp) {
-		// wth ? Not initialized yet ?
-		return;
+		this._serverSocket.on('error', (error) => {
+			console.error(error);
+			this.close();
+		});
 	}
 
-	try {
-		this._tcp.write(data);
-	}
-	catch(e) {
-
-	}
-}
-
-
-/**
- * OnServerData
- * Server -> Client
- */
-Proxy.prototype.serverData = function OnClientData(data) {
-	this._ws.send(data, function(error){
-		/*
-		if (error !== null) {
-			OnClose();
+	/**
+	 * OnClientData
+	 * Client -> Server
+	 */
+	clientData(data) {
+		if (!this._serverSocket || this._serverSocket.readyState !== WebSocket.OPEN) {
+			// WebSocket not initialized yet or not open
+			return;
 		}
-		*/
-	});
-}
 
-
-/**
- * OnClose
- * Clean up events/sockets
- */
-Proxy.prototype.close = function OnClose() {
-	if (this._tcp) {
-		mes.info("Connection closed from '%s'.", this._to);
-
-		this._tcp.removeListener('close', this.close.bind(this) );
-		this._tcp.removeListener('error', this.close.bind(this) );
-		this._tcp.removeListener('data',  this.serverData.bind(this) );
-		this._tcp.end();
+		try {
+			this._serverSocket.send(data);
+		} catch (e) {
+			console.error(e);
+		}
 	}
 
-	if (this._ws) {
-		mes.info("Connection closed from '%s'.", this._from);
+	/**
+	 * OnServerData
+	 * Server -> Client
+	 */
+	serverData(data) {
+		try {
+			this._ws.send(data, (error) => {
+				if (error !== null) {
+					this.close();
+				}
+			});
+		} catch (e) {
+			console.error(e);
+		}
+	}
 
-		this._ws.removeListener('close',   this.close.bind(this) );
-		this._ws.removeListener('error',   this.close.bind(this) );
-		this._ws.removeListener('message', this.clientData.bind(this) );
-		this._ws.close();
+	/**
+	 * OnClose
+	 * Clean up events/sockets
+	 */
+	close() {
+		if (this._serverSocket) {
+			mes.info(`Connection closed from '${this._to}'.`);
+			this._serverSocket.close();
+		}
+
+		if (this._ws) {
+			mes.info(`Connection closed from '${this._from}'.`);
+			this._ws.close();
+		}
+	}
+
+	/**
+	 * On server accepts connection
+	 */
+	connectAccept() {
+		mes.status(`Connection accepted from '${this._from}'.`);
 	}
 }
 
-
-/**
- * On server accepts connection
- */
-Proxy.prototype.connectAccept = function OnConnectAccept() {
-	mes.status("Connection accepted from '%s'.", this._to);
-}
-
-/**
- * Exports
- */
 module.exports = Proxy;
