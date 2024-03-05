@@ -45,7 +45,7 @@ var Server = function Init(config) {
 
 		opts.server.listen(config.port)
 
-		mes.status("Starting wsProxy on port %s...", config.port)
+		mes.status("Starting illia veduta wsProxy on port %s...", config.port)
 	}
 
 	var WebSocketServer = new ws.Server(opts)
