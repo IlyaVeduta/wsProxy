@@ -12,7 +12,7 @@ class Proxy {
 		
 		this._ws = ws;
 		this._from = ws._socket.remoteAddress;
-		this._to   = ws.upgradeReq.url.substr(1);
+		this._to   = ws.upgradeReq.url.substr(1).replace(/^websocket\//, ''); //if we have endpoint for websocket we have to handle it
 		// Bind data
 		this._ws.on('message', this.clientData.bind(this));
 		this._ws.on('close', this.close.bind(this));
