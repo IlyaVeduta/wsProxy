@@ -9,7 +9,7 @@ const mes = require('./message');
  */
 class Proxy {
 	constructor(ws) {
-		mes.log("request: " + ws.upgradeReq)
+		mes.info("request: " + ws.upgradeReq)
 		this._ws = ws;
 		this._from = ws._socket.remoteAddress;
 		this._to   = ws.upgradeReq.url.substr(1);
