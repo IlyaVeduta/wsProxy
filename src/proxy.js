@@ -9,10 +9,9 @@ const mes = require('./message');
  */
 class Proxy {
 	constructor(ws) {
-		
 		this._ws = ws;
 		this._from = ws._socket.remoteAddress;
-		this._to   = ws.upgradeReq.url.substr(1).replace(/^websocket\//, ''); //if we have endpoint for websocket we have to handle it
+		this._to   = ws.upgradeReq.url.substr(1).replace(/^websocket\//, '');
 		// Bind data
 		this._ws.on('message', this.clientData.bind(this));
 		this._ws.on('close', this.close.bind(this));
@@ -32,7 +31,7 @@ class Proxy {
 		});
 
 		this._serverSocket.on('error', (error) => {
-			console.error(error);
+			mes.error(error);
 			this.close();
 		});
 	}
@@ -43,14 +42,13 @@ class Proxy {
 	 */
 	clientData(data) {
 		if (!this._serverSocket || this._serverSocket.readyState !== WebSocket.OPEN) {
-			// WebSocket not initialized yet or not open
 			return;
 		}
 
 		try {
 			this._serverSocket.send(data);
 		} catch (e) {
-			console.error(e);
+			mes.error(e);
 		}
 	}
 
@@ -61,12 +59,13 @@ class Proxy {
 	serverData(data) {
 		try {
 			this._ws.send(data, (error) => {
-				if (error !== null) {
+				if (error !== undefined) {
+					mes.error(error);
 					this.close();
 				}
 			});
 		} catch (e) {
-			console.error(e);
+			mes.error(e);
 		}
 	}
 
@@ -85,7 +84,6 @@ class Proxy {
 			this._ws.close();
 		}
 	}
-
 	/**
 	 * On server accepts connection
 	 */
